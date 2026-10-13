@@ -1,0 +1,6 @@
+{
+  "name": "AI Creator Studio",
+  "description": "All-in-one AI Creator Studio with 8 specialized tools, daily quotas, and local history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
