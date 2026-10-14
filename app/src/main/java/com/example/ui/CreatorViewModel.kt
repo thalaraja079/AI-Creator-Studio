@@ -55,7 +55,8 @@ data class CreatorUiState(
     val history: List<GenerationHistoryItem> = emptyList(),
     val customApiKey: String = "",
     val effectiveApiKey: String = "",
-    val selectedModel: String = CreatorPreferences.DEFAULT_MODEL
+    val selectedModel: String = CreatorPreferences.DEFAULT_MODEL,
+    val showSignUpSuccessDialog: Boolean = false
 )
 
 class CreatorViewModel(application: Application) : AndroidViewModel(application) {
@@ -180,12 +181,7 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
                     
                     _uiState.update {
                         it.copy(
-                            isLoggedIn = true,
-                            userName = preferences.getUserName(),
-                            userEmail = preferences.getUserEmail(),
-                            remainingQuota = preferences.getRemainingQuota(),
-                            authErrorMessage = null,
-                            currentTab = CreatorTab.HOME
+                            showSignUpSuccessDialog = true
                         )
                     }
                 } else {
@@ -194,6 +190,23 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         return true
+    }
+
+    fun finalizeSignUp() {
+        _uiState.update {
+            it.copy(
+                isLoggedIn = true,
+                userName = preferences.getUserName(),
+                userEmail = preferences.getUserEmail(),
+                remainingQuota = preferences.getRemainingQuota(),
+                showSignUpSuccessDialog = false,
+                currentTab = CreatorTab.HOME
+            )
+        }
+    }
+
+    fun dismissSignUpSuccessDialog() {
+        _uiState.update { it.copy(showSignUpSuccessDialog = false) }
     }
 
     fun loginWithGoogle(name: String = "Google Creator", email: String = "creator.google@gmail.com") {

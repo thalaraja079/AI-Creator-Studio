@@ -427,7 +427,10 @@ fun AuthScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { 
+                            email = it
+                            viewModel.clearAuthErrorMessage()
+                        },
                         placeholder = { Text("creator@studio.ai") },
                         leadingIcon = {
                             Icon(
@@ -446,6 +449,25 @@ fun AuthScreen(
                             unfocusedBorderColor = Color(0xFF374151)
                         )
                     )
+
+                    if (state.showSignUpSuccessDialog) {
+                        AlertDialog(
+                            onDismissRequest = { viewModel.finalizeSignUp() },
+                            title = { Text("Success!") },
+                            text = { Text("Account Created Successfully! Welcome to AI Creator Studio.") },
+                            confirmButton = {
+                                Button(
+                                    onClick = { viewModel.finalizeSignUp() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Let's Go!")
+                                }
+                            },
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(22.dp)
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
