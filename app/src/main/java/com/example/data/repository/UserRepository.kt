@@ -13,9 +13,12 @@ class UserRepository(private val apiKey: String) {
     private val projectId = "ai-creator-studio-e0ac3"
     private val baseUrl = "https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users"
 
-    fun getUserData(localId: String, callback: (JSONObject?) -> Unit) {
+    fun getUserData(localId: String, idToken: String, callback: (JSONObject?) -> Unit) {
         val url = "$baseUrl/$localId?key=$apiKey"
-        val request = Request.Builder().url(url).build()
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Authorization", "Bearer $idToken")
+            .build()
         client.newCall(request).enqueue(object : okhttp3.Callback {
             override fun onFailure(call: okhttp3.Call, e: IOException) {
                 callback(null)
@@ -35,7 +38,7 @@ class UserRepository(private val apiKey: String) {
         })
     }
 
-    fun updateUserData(localId: String, remainingCredits: Int, usedCredits: Int, lastResetDate: String) {
+    fun updateUserData(localId: String, idToken: String, remainingCredits: Int, usedCredits: Int, lastResetDate: String) {
         val url = "$baseUrl/$localId?key=$apiKey&updateMask.fieldPaths=remaining_credits&updateMask.fieldPaths=used_credits&updateMask.fieldPaths=last_reset_date"
         val json = JSONObject().apply {
             put("fields", JSONObject().apply {
@@ -45,7 +48,11 @@ class UserRepository(private val apiKey: String) {
             })
         }
         val body = json.toString().toRequestBody("application/json".toMediaType())
-        val request = Request.Builder().url(url).patch(body).build()
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Authorization", "Bearer $idToken")
+            .patch(body)
+            .build()
         client.newCall(request).enqueue(object : okhttp3.Callback {
             override fun onFailure(call: okhttp3.Call, e: IOException) {
                 Log.e("UserRepository", "Failed to update user data", e)
@@ -56,7 +63,7 @@ class UserRepository(private val apiKey: String) {
         })
     }
     
-    fun createUser(localId: String, email: String, maxCredits: Int, lastResetDate: String) {
+    fun createUser(localId: String, idToken: String, email: String, maxCredits: Int, lastResetDate: String) {
         val url = "$baseUrl?key=$apiKey&documentId=$localId"
         val json = JSONObject().apply {
             put("fields", JSONObject().apply {
@@ -68,7 +75,11 @@ class UserRepository(private val apiKey: String) {
             })
         }
         val body = json.toString().toRequestBody("application/json".toMediaType())
-        val request = Request.Builder().url(url).post(body).build()
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Authorization", "Bearer $idToken")
+            .post(body)
+            .build()
         client.newCall(request).enqueue(object : okhttp3.Callback {
             override fun onFailure(call: okhttp3.Call, e: IOException) {
                 Log.e("UserRepository", "Failed to create user", e)
