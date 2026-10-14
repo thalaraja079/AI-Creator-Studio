@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.AiTool
 import com.example.data.AiToolId
 import com.example.data.CreatorPreferences
-import com.example.data.GeminiApiClient
+import com.example.data.AiGenerationService
 import com.example.data.GenerationHistoryItem
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -23,12 +23,7 @@ enum class CreatorTab(val title: String, val iconLabel: String) {
     SETTINGS("Settings", "settings")
 }
 
-enum class KeyTestStatus {
-    IDLE,
-    TESTING,
-    SUCCESS,
-    ERROR
-}
+
 
 data class CreatorUiState(
     val currentTab: CreatorTab = CreatorTab.HOME,
@@ -60,9 +55,7 @@ data class CreatorUiState(
     val history: List<GenerationHistoryItem> = emptyList(),
     val customApiKey: String = "",
     val effectiveApiKey: String = "",
-    val selectedModel: String = CreatorPreferences.DEFAULT_MODEL,
-    val keyTestStatus: KeyTestStatus = KeyTestStatus.IDLE,
-    val keyTestMessage: String? = null
+    val selectedModel: String = CreatorPreferences.DEFAULT_MODEL
 )
 
 class CreatorViewModel(application: Application) : AndroidViewModel(application) {
@@ -367,13 +360,7 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
             return
         }
 
-        val apiKey = preferences.getEffectiveApiKey()
-        if (apiKey.isEmpty()) {
-            _uiState.update {
-                it.copy(errorMessage = "Gemini API Key is not set. Go to Settings or Secrets to configure your key.")
-            }
-            return
-        }
+        // API key check removed as we use the production worker
 
         viewModelScope.launch {
             _uiState.update {
@@ -391,9 +378,7 @@ $input
 Structure with bold headings, clean bullet points, actionable tips, and tags where appropriate.
             """.trimIndent()
 
-            val result = GeminiApiClient.generateContent(
-                apiKey = apiKey,
-                model = state.selectedModel,
+            val result = AiGenerationService.generateContent(
                 prompt = prompt
             )
 
@@ -446,14 +431,6 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
             return
         }
 
-        val apiKey = preferences.getEffectiveApiKey()
-        if (apiKey.isEmpty()) {
-            _uiState.update {
-                it.copy(errorMessage = "Gemini API Key is not configured. Configure it in Settings.")
-            }
-            return
-        }
-
         val tool = AiTool.findById(state.selectedToolId)
         val finalPrompt = tool.systemPromptTemplate(input, state.toolExtraArg)
 
@@ -466,9 +443,7 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
                 )
             }
 
-            val result = GeminiApiClient.generateContent(
-                apiKey = apiKey,
-                model = state.selectedModel,
+            val result = AiGenerationService.generateContent(
                 prompt = finalPrompt
             )
 
@@ -557,9 +532,7 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
         _uiState.update {
             it.copy(
                 customApiKey = key,
-                effectiveApiKey = preferences.getEffectiveApiKey(),
-                keyTestStatus = KeyTestStatus.IDLE,
-                keyTestMessage = null
+                effectiveApiKey = preferences.getEffectiveApiKey()
             )
         }
     }
@@ -569,53 +542,6 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
         _uiState.update { it.copy(selectedModel = model) }
     }
 
-    fun testApiKey() {
-        val apiKey = preferences.getEffectiveApiKey()
-        if (apiKey.isBlank()) {
-            _uiState.update {
-                it.copy(
-                    keyTestStatus = KeyTestStatus.ERROR,
-                    keyTestMessage = "API Key is empty. Please enter a key or set GEMINI_API_KEY."
-                )
-            }
-            return
-        }
-
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    keyTestStatus = KeyTestStatus.TESTING,
-                    keyTestMessage = "Verifying with Gemini endpoint..."
-                )
-            }
-
-            val testPrompt = "Reply with exactly one word: 'CONNECTED'."
-            val result = GeminiApiClient.generateContent(
-                apiKey = apiKey,
-                model = _uiState.value.selectedModel,
-                prompt = testPrompt
-            )
-
-            result.fold(
-                onSuccess = { response ->
-                    _uiState.update {
-                        it.copy(
-                            keyTestStatus = KeyTestStatus.SUCCESS,
-                            keyTestMessage = "Success! Gemini API is active ($response)"
-                        )
-                    }
-                },
-                onFailure = { error ->
-                    _uiState.update {
-                        it.copy(
-                            keyTestStatus = KeyTestStatus.ERROR,
-                            keyTestMessage = "Test failed: ${error.message}"
-                        )
-                    }
-                }
-            )
-        }
-    }
 
     // History Actions
     fun deleteHistoryItem(id: String) {
