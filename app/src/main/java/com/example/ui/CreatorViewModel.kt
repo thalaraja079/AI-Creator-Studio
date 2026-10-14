@@ -385,19 +385,20 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
             result.fold(
                 onSuccess = { responseText ->
                     preferences.deductCredit()
+                    val cleanResponse = cleanAiResponse(responseText)
                     val historyItem = GenerationHistoryItem(
                         toolId = "QUICK_STUDIO",
                         toolTitle = "Quick Studio Generator",
                         emojiIcon = "✨",
                         prompt = input,
-                        output = responseText
+                        output = cleanResponse
                     )
                     preferences.saveHistoryItem(historyItem)
                     _uiState.update {
                         it.copy(
                             isGenerating = false,
                             generatingTarget = null,
-                            quickOutput = responseText,
+                            quickOutput = cleanResponse,
                             remainingQuota = preferences.getRemainingQuota(),
                             history = preferences.getHistory()
                         )
@@ -450,19 +451,20 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
             result.fold(
                 onSuccess = { responseText ->
                     preferences.deductCredit()
+                    val cleanResponse = cleanAiResponse(responseText)
                     val historyItem = GenerationHistoryItem(
                         toolId = tool.id.name,
                         toolTitle = tool.title,
                         emojiIcon = tool.emojiIcon,
                         prompt = input,
-                        output = responseText
+                        output = cleanResponse
                     )
                     preferences.saveHistoryItem(historyItem)
                     _uiState.update {
                         it.copy(
                             isGenerating = false,
                             generatingTarget = null,
-                            toolOutput = responseText,
+                            toolOutput = cleanResponse,
                             remainingQuota = preferences.getRemainingQuota(),
                             history = preferences.getHistory()
                         )
@@ -552,5 +554,14 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
     fun clearHistory() {
         preferences.clearHistory()
         _uiState.update { it.copy(history = emptyList()) }
+    }
+
+    private fun cleanAiResponse(response: String): String {
+        return response
+            .replace("\\n", "\n")
+            .replace("### ", "")
+            .replace("###", "")
+            .replace("**", "")
+            .trim()
     }
 }
