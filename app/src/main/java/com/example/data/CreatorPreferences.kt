@@ -216,6 +216,10 @@ class CreatorPreferences(private val context: Context) {
             .apply()
     }
 
+    fun setUsedQuotaForLogin(used: Int) {
+        prefs.edit().putInt(KEY_USED_QUOTA, used).apply()
+    }
+
     fun deleteAccountAndWipeData() {
         prefs.edit().clear().apply()
     }

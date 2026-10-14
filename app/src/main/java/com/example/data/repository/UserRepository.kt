@@ -13,7 +13,7 @@ class UserRepository(private val apiKey: String) {
     private val projectId = "ai-creator-studio-e0ac3"
     private val baseUrl = "https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users"
 
-    fun getUserQuota(localId: String, callback: (Int?) -> Unit) {
+    fun getUserData(localId: String, callback: (JSONObject?) -> Unit) {
         val url = "$baseUrl/$localId?key=$apiKey"
         val request = Request.Builder().url(url).build()
         client.newCall(request).enqueue(object : okhttp3.Callback {
@@ -27,8 +27,7 @@ class UserRepository(private val apiKey: String) {
                 }
                 try {
                     val json = JSONObject(response.body?.string() ?: "")
-                    val usedQuota = json.getJSONObject("fields").getJSONObject("used_quota").getInt("integerValue")
-                    callback(usedQuota)
+                    callback(json.getJSONObject("fields"))
                 } catch (e: Exception) {
                     callback(null)
                 }
@@ -36,12 +35,12 @@ class UserRepository(private val apiKey: String) {
         })
     }
 
-    fun updateUserQuota(localId: String, usedQuota: Int) {
-        val url = "$baseUrl/$localId?key=$apiKey&updateMask.fieldPaths=used_quota"
+    fun updateUserData(localId: String, remainingCredits: Int) {
+        val url = "$baseUrl/$localId?key=$apiKey&updateMask.fieldPaths=remaining_credits"
         val json = JSONObject().apply {
             put("fields", JSONObject().apply {
-                put("used_quota", JSONObject().apply {
-                    put("integerValue", usedQuota.toString())
+                put("remaining_credits", JSONObject().apply {
+                    put("integerValue", remainingCredits.toString())
                 })
             })
         }
@@ -49,7 +48,7 @@ class UserRepository(private val apiKey: String) {
         val request = Request.Builder().url(url).patch(body).build()
         client.newCall(request).enqueue(object : okhttp3.Callback {
             override fun onFailure(call: okhttp3.Call, e: IOException) {
-                Log.e("UserRepository", "Failed to update quota", e)
+                Log.e("UserRepository", "Failed to update credits", e)
             }
             override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
                 // Ignore
@@ -57,13 +56,13 @@ class UserRepository(private val apiKey: String) {
         })
     }
     
-    fun createUser(localId: String, initialUsedQuota: Int) {
+    fun createUser(localId: String, email: String, maxCredits: Int) {
         val url = "$baseUrl?key=$apiKey&documentId=$localId"
         val json = JSONObject().apply {
             put("fields", JSONObject().apply {
-                put("used_quota", JSONObject().apply {
-                    put("integerValue", initialUsedQuota.toString())
-                })
+                put("email", JSONObject().apply { put("stringValue", email) })
+                put("remaining_credits", JSONObject().apply { put("integerValue", maxCredits.toString()) })
+                put("max_credits", JSONObject().apply { put("integerValue", maxCredits.toString()) })
             })
         }
         val body = json.toString().toRequestBody("application/json".toMediaType())

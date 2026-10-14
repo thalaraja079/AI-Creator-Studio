@@ -117,18 +117,30 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
             authClient.login(email, pass) { success, error ->
                 if (success) {
                     val localId = preferences.getLocalId()
+                    val email = preferences.getUserEmail()
                     val userRepository = getApplication<android.app.Application>().let { (it as com.example.CreatorApplication).userRepository }
-                    userRepository.getUserQuota(localId) { used ->
-                        if (used == null) {
+                    val maxCredits = adConfigRepository.getDailyFreeQuota()
+                    
+                    userRepository.getUserData(localId) { fields ->
+                        if (fields == null) {
                             // First time login - init user in Firestore
-                            userRepository.createUser(localId, 0)
+                            userRepository.createUser(localId, email, maxCredits)
+                            preferences.resetQuotaToFull()
+                        } else {
+                            // Existing user - fetch remaining credits
+                            val remainingCredits = fields.getJSONObject("remaining_credits").getInt("integerValue")
+                            // used = max - remaining
+                            val used = maxOf(0, maxCredits - remainingCredits)
+                            preferences.setUsedQuotaForLogin(used)
                         }
                     }
+                    
                     _uiState.update {
                         it.copy(
                             isLoggedIn = true,
                             userName = preferences.getUserName(),
                             userEmail = preferences.getUserEmail(),
+                            remainingQuota = preferences.getRemainingQuota(),
                             authErrorMessage = null,
                             currentTab = CreatorTab.HOME
                         )
@@ -159,13 +171,19 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
             authClient.signUp(email, pass, name) { success, error ->
                 if (success) {
                     val localId = preferences.getLocalId()
+                    val email = preferences.getUserEmail()
                     val userRepository = getApplication<android.app.Application>().let { (it as com.example.CreatorApplication).userRepository }
-                    userRepository.createUser(localId, 0)
+                    val maxCredits = adConfigRepository.getDailyFreeQuota()
+                    
+                    userRepository.createUser(localId, email, maxCredits)
+                    preferences.resetQuotaToFull()
+                    
                     _uiState.update {
                         it.copy(
                             isLoggedIn = true,
                             userName = preferences.getUserName(),
                             userEmail = preferences.getUserEmail(),
+                            remainingQuota = preferences.getRemainingQuota(),
                             authErrorMessage = null,
                             currentTab = CreatorTab.HOME
                         )
@@ -404,6 +422,11 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
             result.fold(
                 onSuccess = { responseText ->
                     preferences.deductCredit()
+                    val newRemaining = preferences.getRemainingQuota()
+                    val localId = preferences.getLocalId()
+                    val userRepository = getApplication<android.app.Application>().let { (it as com.example.CreatorApplication).userRepository }
+                    userRepository.updateUserData(localId, newRemaining)
+                    
                     val cleanResponse = cleanAiResponse(responseText)
                     val historyItem = GenerationHistoryItem(
                         toolId = "QUICK_STUDIO",
@@ -418,7 +441,7 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
                             isGenerating = false,
                             generatingTarget = null,
                             quickOutput = cleanResponse,
-                            remainingQuota = preferences.getRemainingQuota(),
+                            remainingQuota = newRemaining,
                             history = preferences.getHistory()
                         )
                     }
@@ -470,6 +493,11 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
             result.fold(
                 onSuccess = { responseText ->
                     preferences.deductCredit()
+                    val newRemaining = preferences.getRemainingQuota()
+                    val localId = preferences.getLocalId()
+                    val userRepository = getApplication<android.app.Application>().let { (it as com.example.CreatorApplication).userRepository }
+                    userRepository.updateUserData(localId, newRemaining)
+                    
                     val cleanResponse = cleanAiResponse(responseText)
                     val historyItem = GenerationHistoryItem(
                         toolId = tool.id.name,
@@ -484,7 +512,7 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
                             isGenerating = false,
                             generatingTarget = null,
                             toolOutput = cleanResponse,
-                            remainingQuota = preferences.getRemainingQuota(),
+                            remainingQuota = newRemaining,
                             history = preferences.getHistory()
                         )
                     }
@@ -521,12 +549,17 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
             }
             // Add credit
             preferences.addCredit()
+            val newRemaining = preferences.getRemainingQuota()
+            val localId = preferences.getLocalId()
+            val userRepository = getApplication<android.app.Application>().let { (it as com.example.CreatorApplication).userRepository }
+            userRepository.updateUserData(localId, newRemaining)
+            
             delay(300)
             _uiState.update {
                 it.copy(
                     showRewardedAdDialog = false,
                     adProgress = 1f,
-                    remainingQuota = preferences.getRemainingQuota()
+                    remainingQuota = newRemaining
                 )
             }
         }
