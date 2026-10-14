@@ -1,115 +1,79 @@
-# AI Creator Studio - Modern Creator Toolkit
+# AI Creator Studio - Updates & Enhancements Plan
 
-AI Creator Studio is an all-in-one Android application tailored for content creators, video producers, marketers, and storytellers. It bundles 8 specialized AI generation tools, direct quick-generation, a daily quota system with rewarded credit replenishment, and persistent local history and settings.
+This plan details the implementation of 4 focused updates to elevate the visual branding, UX flow, and ad monetization experience in AI Creator Studio: custom logo branding, vertical tool directory, fixed bottom banner ad above navigation, and robust rewarded ad credit replenishment.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The architectural direction follows a crash-resilient, lightweight engine: no Firebase, Room, KSP, or Retrofit. Direct OkHttp with `org.json` is used for Gemini REST communication, and Android `SharedPreferences` manages quota and history.
+> The existing architecture (OkHttp, org.json, SharedPreferences) will remain completely intact. Google Mobile Ads SDK (`play-services-ads`) will be integrated with standard official test IDs, wrapped in crash-proof Compose containers with visual emulator fallbacks.
 
-- **Confirmed Decision (Formatting Style)**: AI responses will use a structured rich layout with clear bold section headings, bulleted breakdowns, and copy-ready tags.
-- **Confirmed Choice (Ad Reward Card Visibility)**: The "+1 Credit" card strictly renders when `remainingQuota < dailyFreeQuota`, giving creators a quick simulated rewarded ad dialog to replenish credits.
-- **Confirmed Choice (Sample Prompts)**: Interactive 1-tap example chips will be included on each tool screen to make immediate testing effortless.
-
----
-
-## 1. Overview & Core Concept
-
-- **What It Does**: Empowers creators to generate YouTube viral titles & SEO tags, long-form video scripts, cinematic image generation prompts, viral Reels/Shorts hooks, e-commerce product ad copy, multilingual polished translations, brand sponsorship pitches, and narrative stories.
-- **Target Audience**: YouTubers, Instagram & TikTok creators, e-commerce shop owners, copywriters, and creative storytellers.
-- **Key Value**: Delivers hyper-tailored prompts to Gemini models without setup friction, tracks daily usage quotas, and allows instantaneous copying of specialized segments (such as separate Title, Script, or Tag copy actions).
+- **Confirmed Decision (Tools Tab Layout)**: The Tools tab will feature a full-width vertical card list for all 8 tools, each displaying its colored icon badge, title, subtitle, and trailing navigation chevron. Tapping opens the dedicated tool generator screen with a prominent "← Back to All Tools" button and `BackHandler`.
+- **Confirmed Choice (Fixed Banner Ad)**: A persistent 50.dp container directly above the bottom navigation bar will host the Google Mobile Ads test banner (`ca-app-pub-3940256099942544/6300978111`) with a sleek dark fallback UI for web/emulator preview resilience.
 
 ---
 
-## 2. User Experience & Visual Design
+## 1. Overview of Proposed Changes
 
-### Navigation & Layout Structure
-A modern Material 3 `Scaffold` with edge-to-edge system insets and a 4-item bottom navigation bar:
-1. **Home**: Header badge, Daily Quota status card, conditional "+1 Credit Ad" card, Direct Quick AI Studio Generator, and Popular Tools grid.
-2. **Tools**: Category selector and detailed cards for all 8 creator tools with custom inputs, quick presets, generation states, and tailored multi-copy action bars.
-3. **History**: Filterable reverse-chronological list of saved generations with individual copy, delete, and clear-all actions.
-4. **Settings**: Custom Gemini API Key entry, Model selector (`gemini-2.5-flash` default), API Key verification tester, and developer quota reset tools.
+1. **Custom App Logo & Launcher Icons**:
+   - Download the user's custom brand logo from Google Drive.
+   - Generate all raster densities (`mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`) for `ic_launcher.png` and circular `ic_launcher_round.png`.
+   - Update `ic_launcher_foreground.xml` and `ic_launcher_background.xml` to eliminate any clipping artifacts.
+   - Add a circular logo badge in the Home top header next to "AI Creator Studio".
 
-### Visual Identity & Theme
-- **Theme Direction**: Deep creator dark theme with obsidian background (`#0B0F19`), surface layers (`#131B2E` and `#1E293B`), and vibrant violet-to-blue gradient accents (`0xFF8B5CF6` to `0xFF3B82F6`).
-- **Card Geometry**: Consistent `20.dp` rounded corners across all cards, dialogs, and text fields.
-- **Accents**: Distinct vibrant signature color accents for each tool (Amber for SEO, Red for Scripts, Purple for Image Prompts, Pink for Shorts Hooks, Emerald for Ad Copy, Blue for Translator, Cyan for Sponsorships, Orange for Stories).
-- **Motion & Feedback**: Animated visibility transitions for generated output cards, progress indicators during generation and rewarded ad simulation, and clear snackbar notifications for copy actions.
+2. **Vertical Tool Directory (`ToolsTab.kt`)**:
+   - Replace top horizontal chip bar with a master-detail flow:
+     - **Tool List Screen**: Vertical `LazyColumn` presenting all 8 tools as clean, full-width cards with vibrant icon badges and navigation chevrons.
+     - **Tool Detail Screen**: Opened upon card click (and from Home Popular Tools). Includes a prominent "← Back to All Tools" back button, preset chips, custom input, and specialized copy bars.
 
----
+3. **Fixed Bottom Banner Ad**:
+   - Add `com.google.android.gms:play-services-ads` to `app/build.gradle.kts`.
+   - Add test AdMob `APPLICATION_ID` (`ca-app-pub-3940256099942544~3347511713`) in `AndroidManifest.xml`.
+   - Implement `FixedBottomBannerAd` composable anchored above `NavigationBar` in `MainScreen.kt` using test unit ID `ca-app-pub-3940256099942544/6300978111` with a sleek 50.dp emulator-safe placeholder.
 
-## 3. Key Product Decisions & Trade-Offs
-
-- **Decision 1: Direct OkHttp & org.json over Retrofit/SDKs**
-  - *Chosen Approach*: Lightweight `GeminiApiClient` using OkHttp with 60-second timeouts and native `org.json` parsing. Model names are automatically cleaned with `removePrefix("models/")` to prevent 404 errors.
-  - *Why*: Eliminates boilerplate, avoids KSP/Room annotation processing bugs, and guarantees 100% build stability on first compile.
-- **Decision 2: SharedPreferences Local Store for Persistence**
-  - *Chosen Approach*: `CreatorPreferences` repository managing daily quota, date-based midnight resets, generation history entries serialized as JSON arrays, and custom API key overrides.
-  - *Why*: Immediate startup performance, zero SQL migrations, and total offline resilience.
-- **Decision 3: Specialized Multi-Action Copy Buttons**
-  - *Chosen Approach*: On tools like YouTube SEO Tags and Reels/Shorts Hooks, provide both "Copy All" and granular segment copying (e.g., "Copy Titles", "Copy Description", "Copy Tags & Hashtags").
-  - *Why*: Creators need specific segments directly in their YouTube Studio or Instagram paste buffers without tedious manual text selection.
+4. **Watch Ad to Earn +1 Credit**:
+   - Maintain strict conditional rendering `if (state.remainingQuota < state.dailyFreeQuota)` on Home.
+   - Refine rewarded ad trigger to smoothly award +1 credit upon completion and update `CreatorPreferences`.
 
 ---
 
-## 4. Technical Architecture & Data Strategy
+## 2. Technical Architecture & Component Flow
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        MainActivity (Compose Edge-to-Edge)             │
+│                        MainScreen (Scaffold)                           │
 │                                                                        │
 │   ┌────────────────────────────────────────────────────────────────┐   │
-│   │                     MainScreen (BottomBar)                     │   │
-│   │                                                                │   │
+│   │                      Active Tab Content                        │   │
 │   │  [HomeTab]        [ToolsTab]        [HistoryTab]  [SettingsTab]│   │
-│   │   • Quota Card     • 8 Specialized   • Saved List  • Custom Key│   │
-│   │   • Ad Card (+1)     Tool Sheets     • Copy/Delete • Model Pick│   │
-│   │   • Quick Studio   • Multi-Copy      • Clear All   • Quota Dev │   │
-│   │   • Tool Grid      • Sample Chips                  • Key Test  │   │
-│   └────────────────────────────────┬───────────────────────────────┘   │
-└────────────────────────────────────┼───────────────────────────────────┘
-                                     │
-                     ┌───────────────┴───────────────┐
-                     ▼                               ▼
-       ┌───────────────────────────┐   ┌───────────────────────────┐
-       │     CreatorViewModel      │   │     CreatorPreferences    │
-       │  • Quota State & Ad Flow  │   │  • SharedPreferences      │
-       │  • Generation Execution   │   │  • Quota & Date Tracking  │
-       │  • History State Store    │   │  • History (JSON Array)   │
-       │  • Tool State Management  │   │  • Custom API Key Store   │
-       └─────────────┬─────────────┘   └───────────────────────────┘
-                     │
-                     ▼
-       ┌───────────────────────────┐
-       │      GeminiApiClient      │
-       │  • OkHttp Client (60s)    │
-       │  • URL: generateContent   │
-       │  • Clean Model Prefix     │
-       │  • org.json Payload Parse │
-       └───────────────────────────┘
+│   │   • Logo Badge     • Master: 8 Vertical Cards                  │   │
+│   │   • Quota Card     • Detail: "← Back" + Generator Screen       │   │
+│   │   • Watch Ad Card    - YouTube SEO: Dedicated Copy Buttons     │   │
+│   │   • Quick Studio     - Translator: Target Language selector    │   │
+│   └────────────────────────────────────────────────────────────────┘   │
+│                                                                        │
+│   ┌────────────────────────────────────────────────────────────────┐   │
+│   │  Fixed Bottom Banner Ad (Google Mobile Ads / 50.dp Container)  │   │
+│   │  Test Ad Unit: ca-app-pub-3940256099942544/6300978111          │   │
+│   └────────────────────────────────────────────────────────────────┘   │
+│   ┌────────────────────────────────────────────────────────────────┐   │
+│   │  Bottom Navigation Bar (Home | Tools | History | Settings)     │   │
+│   └────────────────────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────────────────────────┘
 ```
-
-### Data Entities & State Models
-- `AiTool`: Enum of all 8 tools with titles, subtitles, icons, colors, prompts, and sample presets.
-- `GenerationHistoryItem`: Unique ID, tool id, prompt, result text, formatted timestamp.
-- `CreatorStudioState`: Quota counts, remaining quota, active tool, current input, generation loading status, error message, and ad watching status.
-- `GeminiApiClient`: Pure Kotlin class executing `POST https://generativelanguage.googleapis.com/v1beta/models/{cleanModel}:generateContent?key={apiKey}` with standard error handling.
 
 ---
 
-## 5. Verification Plan
+## 3. Verification Plan
 
-1. **Gradle Build Verification**: Execute `compile_applet` to confirm zero compilation errors.
-2. **Quota & Ad Testing**:
-   - Check default 5/5 credits display.
-   - Use direct generator to consume 1 credit -> verify remaining becomes 4/5.
-   - Verify the "+1 Credit Ad" card immediately appears when `remainingQuota < 5`.
-   - Tap "Watch Ad (+1 Credit)" -> verify ad simulation dialog triggers and increments quota back to 5.
-   - Verify card disappears once quota hits 5/5.
-3. **Tool Features & Copy Verification**:
-   - Test YouTube SEO Tags tool generation and verify dedicated "Copy Titles", "Copy Description", and "Copy Tags" buttons work.
-   - Test Language Selector in AI Translator & Polisher tool (default English).
-4. **History & Settings Verification**:
-   - Verify generated outputs appear immediately in History.
-   - Test item deletion and "Clear All".
-   - Test Settings API key saving and Quota Reset / Simulate Credit consumption actions.
+1. **Gradle Build Verification**: Execute `compile_applet` to confirm clean dependency resolution and zero compilation errors.
+2. **Branding & Icon Verification**:
+   - Inspect Home top header to ensure the downloaded brand logo renders crisply.
+   - Confirm adaptive launcher icons generated across all densities without clipping.
+3. **Tools Tab Navigation Verification**:
+   - Verify opening Tools tab shows the 8 tools in a vertical column with chevrons.
+   - Tap a tool -> verify it opens the detail generator screen with "← Back to All Tools".
+   - Tap "← Back to All Tools" (or hardware back) -> verify return to the vertical list.
+   - Tap a tool from Home Popular Tools -> verify it opens directly to that tool's detail screen.
+4. **AdMob Banner & Rewarded Flow Verification**:
+   - Verify 50.dp fixed banner ad remains visible above the bottom navigation bar across all 4 tabs.
+   - Verify "Watch Ad (+1 Credit)" appears on Home when credits < 5/5, plays the simulation dialog, and awards +1 credit cleanly.

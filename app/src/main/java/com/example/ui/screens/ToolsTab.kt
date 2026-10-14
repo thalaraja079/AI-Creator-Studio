@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -27,9 +28,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
@@ -66,38 +70,51 @@ import com.example.ui.CreatorUiState
 import com.example.ui.CreatorViewModel
 import com.example.ui.components.CreditBadge
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ToolsTab(
     state: CreatorUiState,
     viewModel: CreatorViewModel,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val currentTool = AiTool.findById(state.selectedToolId)
-    var lastCopiedTag by remember { mutableStateOf<String?>(null) }
-
-    fun copyToClipboard(label: String, text: String) {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val safeText = if (text.isNotBlank()) text else state.toolOutput
-        clipboard.setPrimaryClip(ClipData.newPlainText(label, safeText))
-        Toast.makeText(context, "$label copied to clipboard!", Toast.LENGTH_SHORT).show()
-        lastCopiedTag = label
+    if (state.isToolDetailOpen) {
+        // Dedicated Tool Generator Screen
+        ToolDetailGeneratorScreen(
+            state = state,
+            viewModel = viewModel,
+            modifier = modifier
+        )
+    } else {
+        // Vertical One-by-One Tools List Screen
+        ToolsVerticalListScreen(
+            state = state,
+            viewModel = viewModel,
+            modifier = modifier
+        )
     }
+}
 
+/**
+ * 1. Vertical One-by-One Directory of all 8 AI Tools
+ */
+@Composable
+private fun ToolsVerticalListScreen(
+    state: CreatorUiState,
+    viewModel: CreatorViewModel,
+    modifier: Modifier = Modifier
+) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Top Header
+        // Header
         item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("tools_tab_header"),
+                    .testTag("tools_list_header"),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -124,37 +141,178 @@ fun ToolsTab(
             }
         }
 
-        // Horizontal Category Tabs for all 8 Tools
+        // Vertical One-by-One Tool Cards
+        items(AiTool.ALL, key = { it.id.name }) { tool ->
+            VerticalToolCard(
+                tool = tool,
+                onClick = {
+                    viewModel.selectTool(tool.id, openDetail = true)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun VerticalToolCard(
+    tool: AiTool,
+    onClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = tool.primaryColor.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .clickable(onClick = onClick)
+            .testTag("tool_card_${tool.id.name.lowercase()}")
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Icon Badge
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .background(
+                        color = tool.primaryColor.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .border(
+                        0.5.dp,
+                        tool.primaryColor.copy(alpha = 0.4f),
+                        RoundedCornerShape(16.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = tool.emojiIcon, fontSize = 26.sp)
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Title & Subtitle
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = tool.title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = tool.subtitle,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 16.sp
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Trailing Chevron
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(10.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                    contentDescription = "Open ${tool.title}",
+                    tint = tool.primaryColor,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 2. Dedicated Tool Generator Screen with Top Back Button
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ToolDetailGeneratorScreen(
+    state: CreatorUiState,
+    viewModel: CreatorViewModel,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val currentTool = AiTool.findById(state.selectedToolId)
+    var lastCopiedTag by remember { mutableStateOf<String?>(null) }
+
+    // Intercept hardware/gesture back to return to the vertical list
+    BackHandler {
+        viewModel.closeToolDetail()
+    }
+
+    fun copyToClipboard(label: String, text: String) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val safeText = if (text.isNotBlank()) text else state.toolOutput
+        clipboard.setPrimaryClip(ClipData.newPlainText(label, safeText))
+        Toast.makeText(context, "$label copied to clipboard!", Toast.LENGTH_SHORT).show()
+        lastCopiedTag = label
+    }
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 16.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Top Bar with "← Back to All Tools" Button & Credit Badge
         item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .testTag("tools_selector_bar"),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .testTag("tool_detail_header"),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                AiTool.ALL.forEach { tool ->
-                    val isSelected = tool.id == state.selectedToolId
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { viewModel.selectTool(tool.id) },
-                        label = {
-                            Text(
-                                text = "${tool.emojiIcon} ${tool.title}",
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 13.sp
-                            )
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = tool.primaryColor,
-                            selectedLabelColor = Color.White,
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.testTag("filter_chip_${tool.id.name.lowercase()}")
+                OutlinedButton(
+                    onClick = { viewModel.closeToolDetail() },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.testTag("back_to_tools_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "← Back to All Tools",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
+
+                CreditBadge(
+                    remaining = state.remainingQuota,
+                    total = state.dailyFreeQuota
+                )
             }
         }
 
@@ -214,7 +372,7 @@ fun ToolsTab(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Special Feature: Language Selector for AI Translator & Polisher
+                    // Special Feature: Language Selector for AI Translator & Polisher (English default)
                     if (currentTool.id == AiToolId.AI_TRANSLATOR_POLISHER) {
                         Column(
                             modifier = Modifier
@@ -397,15 +555,13 @@ fun ToolsTab(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Generated Package",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = currentTool.primaryColor
-                                    )
+                            Text(
+                                text = "Generated Package",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = currentTool.primaryColor
                                 )
-                            }
+                            )
 
                             // Share Action
                             OutlinedButton(
@@ -435,7 +591,6 @@ fun ToolsTab(
                         // SPECIAL UI COPY BUTTONS FOR TOOLS
                         when (currentTool.id) {
                             AiToolId.YOUTUBE_SEO_TAGS -> {
-                                // Dedicated Copy Buttons: "Copy Titles", "Copy Description", "Copy Tags & Hashtags", "Copy All"
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -491,7 +646,6 @@ fun ToolsTab(
                             }
 
                             AiToolId.REELS_SHORTS_HOOKS -> {
-                                // Dedicated Copy Buttons: "Copy Hooks", "Copy Script", "Copy Captions & Hashtags"
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -547,7 +701,6 @@ fun ToolsTab(
                             }
 
                             else -> {
-                                // Standard Copy All button for other tools
                                 OutlinedButton(
                                     onClick = { copyToClipboard("Output", state.toolOutput) },
                                     shape = RoundedCornerShape(12.dp),

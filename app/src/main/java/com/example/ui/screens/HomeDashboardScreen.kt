@@ -8,9 +8,13 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import com.example.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -93,20 +97,41 @@ fun HomeDashboardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "AI Creator Studio",
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_creator_logo),
+                        contentDescription = "AI Creator Studio Logo",
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.horizontalGradient(
+                                    listOf(Color(0xFF8B5CF6), Color(0xFF3B82F6))
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .testTag("app_logo_badge")
                     )
-                    Text(
-                        text = "Welcome back, Creator 👋",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "AI Creator Studio",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
                         )
-                    )
+                        Text(
+                            text = "Welcome back, Creator 👋",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                    }
                 }
                 CreditBadge(
                     remaining = state.remainingQuota,
@@ -514,7 +539,10 @@ fun HomeDashboardScreen(
                             fontWeight = FontWeight.Bold
                         ),
                         modifier = Modifier
-                            .clickable { viewModel.switchTab(CreatorTab.TOOLS) }
+                            .clickable {
+                                viewModel.closeToolDetail()
+                                viewModel.switchTab(CreatorTab.TOOLS)
+                            }
                             .padding(4.dp)
                             .testTag("see_all_tools_link")
                     )

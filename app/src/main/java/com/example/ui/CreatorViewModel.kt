@@ -35,6 +35,7 @@ data class CreatorUiState(
     val remainingQuota: Int = CreatorPreferences.DEFAULT_MAX_QUOTA,
     val dailyFreeQuota: Int = CreatorPreferences.DEFAULT_MAX_QUOTA,
     val selectedToolId: AiToolId = AiToolId.YOUTUBE_SEO_TAGS,
+    val isToolDetailOpen: Boolean = false,
     val toolInput: String = "",
     val toolExtraArg: String = "English",
     val toolOutput: String = "",
@@ -92,14 +93,19 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
         _uiState.update { it.copy(currentTab = tab, errorMessage = null) }
     }
 
-    fun selectTool(toolId: AiToolId, prefillPrompt: String? = null) {
+    fun selectTool(toolId: AiToolId, prefillPrompt: String? = null, openDetail: Boolean = true) {
         _uiState.update {
             it.copy(
                 selectedToolId = toolId,
                 toolInput = prefillPrompt ?: it.toolInput,
+                isToolDetailOpen = openDetail,
                 errorMessage = null
             )
         }
+    }
+
+    fun closeToolDetail() {
+        _uiState.update { it.copy(isToolDetailOpen = false) }
     }
 
     fun updateToolInput(text: String) {

@@ -1,14 +1,15 @@
 package com.example
 
+import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.AiTool
 import com.example.data.AiToolId
 import com.example.data.CreatorPreferences
 import com.example.data.GenerationHistoryItem
+import com.example.ui.CreatorViewModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -94,5 +95,19 @@ class ExampleRobolectricTest {
 
     prefs.deleteHistoryItem(item.id)
     assertEquals(0, prefs.getHistory().size)
+  }
+
+  @Test
+  fun `tool navigation state toggles detail screen`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val viewModel = CreatorViewModel(context as Application)
+    assertFalse(viewModel.uiState.value.isToolDetailOpen)
+
+    viewModel.selectTool(AiToolId.IMAGE_PROMPT_CRAFTER, openDetail = true)
+    assertTrue(viewModel.uiState.value.isToolDetailOpen)
+    assertEquals(AiToolId.IMAGE_PROMPT_CRAFTER, viewModel.uiState.value.selectedToolId)
+
+    viewModel.closeToolDetail()
+    assertFalse(viewModel.uiState.value.isToolDetailOpen)
   }
 }
