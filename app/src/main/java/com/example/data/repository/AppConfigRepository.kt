@@ -26,15 +26,19 @@ class AppConfigRepository(private val context: Context) {
 
     fun getDailyFreeQuota(): Int = sharedPrefs.getInt("daily_free_quota", 10)
 
-    fun fetchConfig() {
+    fun fetchConfig(onComplete: (() -> Unit)? = null) {
         val request = Request.Builder().url(firestoreUrl).build()
         client.newCall(request).enqueue(object : okhttp3.Callback {
             override fun onFailure(call: okhttp3.Call, e: IOException) {
                 Log.e("AppConfig", "Failed to fetch app config", e)
+                onComplete?.invoke()
             }
 
             override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
-                if (!response.isSuccessful) return
+                if (!response.isSuccessful) {
+                    onComplete?.invoke()
+                    return
+                }
                 val json = response.body?.string() ?: return
                 
                 try {
@@ -57,6 +61,8 @@ class AppConfigRepository(private val context: Context) {
                         
                 } catch (e: Exception) {
                     Log.e("AppConfig", "Error parsing config", e)
+                } finally {
+                    onComplete?.invoke()
                 }
             }
         })

@@ -14,8 +14,7 @@ class CreatorPreferences(private val context: Context) {
         context.getSharedPreferences("ai_creator_studio_prefs", Context.MODE_PRIVATE)
 
     companion object {
-        private const val KEY_DAILY_FREE_QUOTA = "daily_free_quota"
-        private const val KEY_REMAINING_QUOTA = "remaining_quota"
+        private const val KEY_USED_QUOTA = "used_quota" // New key
         private const val KEY_LAST_RESET_DATE = "last_reset_date"
         private const val KEY_CUSTOM_API_KEY = "custom_api_key"
         private const val KEY_SELECTED_MODEL = "selected_model"
@@ -48,158 +47,65 @@ class CreatorPreferences(private val context: Context) {
     fun checkAndResetDailyQuota() {
         val today = getCurrentDateKey()
         val lastDate = prefs.getString(KEY_LAST_RESET_DATE, null)
-        val maxQuota = getDailyFreeQuota()
 
         if (lastDate == null || lastDate != today) {
-            // New day or first launch -> reset remaining quota to max
+            // New day -> reset used quota
             prefs.edit()
                 .putString(KEY_LAST_RESET_DATE, today)
-                .putInt(KEY_REMAINING_QUOTA, maxQuota)
+                .putInt(KEY_USED_QUOTA, 0)
                 .apply()
         }
     }
 
-    // --- Authentication & User Profile Management ---
-
-    fun isLoggedIn(): Boolean {
-        return prefs.getBoolean(KEY_IS_LOGGED_IN, false)
-    }
-
-    fun setLoggedIn(loggedIn: Boolean) {
-        prefs.edit().putBoolean(KEY_IS_LOGGED_IN, loggedIn).apply()
-    }
-
-    fun getUserName(): String {
-        return prefs.getString(KEY_USER_NAME, "Creator") ?: "Creator"
-    }
-
-    fun setUserName(name: String) {
-        prefs.edit().putString(KEY_USER_NAME, name.trim()).apply()
-    }
-
-    fun getUserEmail(): String {
-        return prefs.getString(KEY_USER_EMAIL, "") ?: ""
-    }
-
-    fun setUserEmail(email: String) {
-        prefs.edit().putString(KEY_USER_EMAIL, email.trim()).apply()
-    }
-
-    fun registerUser(name: String, email: String, pass: String): Boolean {
-        prefs.edit()
-            .putBoolean(KEY_IS_LOGGED_IN, true)
-            .putString(KEY_USER_NAME, name.trim())
-            .putString(KEY_USER_EMAIL, email.trim().lowercase())
-            .putString(KEY_USER_PASSWORD, pass)
-            .apply()
-        return true
-    }
-
-    fun loginUser(email: String, pass: String): Boolean {
-        val savedEmail = getUserEmail()
-        val savedPass = prefs.getString(KEY_USER_PASSWORD, "") ?: ""
-
-        // If user already registered, verify credentials
-        if (savedEmail.isNotEmpty() && savedPass.isNotEmpty()) {
-            if (savedEmail.equals(email.trim(), ignoreCase = true) && savedPass == pass) {
-                setLoggedIn(true)
-                return true
-            }
-            return false
-        }
-
-        // First login or initial direct user login
-        val derivedName = email.substringBefore("@").replace(".", " ").capitalize(Locale.ROOT).trim()
-        registerUser(
-            name = if (derivedName.isNotBlank()) derivedName else "Creator",
-            email = email,
-            pass = pass
-        )
-        return true
-    }
-
-    fun loginWithGoogle(name: String, email: String) {
-        prefs.edit()
-            .putBoolean(KEY_IS_LOGGED_IN, true)
-            .putString(KEY_USER_NAME, name.trim())
-            .putString(KEY_USER_EMAIL, email.trim().lowercase())
-            .apply()
-    }
-
-    fun saveAuthTokens(idToken: String, refreshToken: String, localId: String, email: String, name: String) {
-        prefs.edit()
-            .putBoolean(KEY_IS_LOGGED_IN, true)
-            .putString(KEY_ID_TOKEN, idToken)
-            .putString(KEY_REFRESH_TOKEN, refreshToken)
-            .putString(KEY_LOCAL_ID, localId)
-            .putString(KEY_USER_EMAIL, email)
-            .putString(KEY_USER_NAME, name)
-            .apply()
-    }
-
-    fun getIdToken(): String = prefs.getString(KEY_ID_TOKEN, "") ?: ""
-    fun getLocalId(): String = prefs.getString(KEY_LOCAL_ID, "") ?: ""
-    
-    fun logoutUser() {
-        prefs.edit().remove(KEY_IS_LOGGED_IN)
-            .remove(KEY_ID_TOKEN)
-            .remove(KEY_REFRESH_TOKEN)
-            .remove(KEY_LOCAL_ID)
-            .apply()
-    }
-
-    /**
-     * Google Play Policy Compliance: Complete Account Deletion
-     * Permanently wipes user identity, history, quota, and local storage.
-     */
-    fun deleteAccountAndWipeData() {
-        prefs.edit().clear().apply()
-        // Reset quota afresh for clean state
-        resetQuotaToFull()
-    }
-
-    fun requestPasswordReset(email: String): Boolean {
-        // Validates email syntax or registered account
-        return email.contains("@") && email.contains(".")
-    }
-
     // --- Quota Management ---
+
+    private fun getUsedQuota(): Int {
+        // Migration from remaining_quota if necessary
+        if (!prefs.contains(KEY_USED_QUOTA) && prefs.contains("remaining_quota")) {
+            val remaining = prefs.getInt("remaining_quota", 0)
+            val max = getDailyFreeQuota()
+            val used = maxOf(0, max - remaining)
+            prefs.edit().putInt(KEY_USED_QUOTA, used).remove("remaining_quota").apply()
+            return used
+        }
+        return prefs.getInt(KEY_USED_QUOTA, 0)
+    }
 
     fun getDailyFreeQuota(): Int {
         val appConfigPrefs = context.getSharedPreferences("app_config", Context.MODE_PRIVATE)
-        return appConfigPrefs.getInt(KEY_DAILY_FREE_QUOTA, DEFAULT_MAX_QUOTA)
+        return appConfigPrefs.getInt("daily_free_quota", DEFAULT_MAX_QUOTA)
     }
 
     fun getRemainingQuota(): Int {
         checkAndResetDailyQuota()
-        return prefs.getInt(KEY_REMAINING_QUOTA, DEFAULT_MAX_QUOTA)
+        val max = getDailyFreeQuota()
+        val used = getUsedQuota()
+        return maxOf(0, max - used)
     }
 
     fun deductCredit(): Boolean {
-        val current = getRemainingQuota()
-        if (current > 0) {
-            prefs.edit().putInt(KEY_REMAINING_QUOTA, current - 1).apply()
+        val used = getUsedQuota()
+        val max = getDailyFreeQuota()
+        if (used < max) {
+            prefs.edit().putInt(KEY_USED_QUOTA, used + 1).apply()
             return true
         }
         return false
     }
 
     fun addCredit(): Boolean {
-        val current = getRemainingQuota()
-        val max = getDailyFreeQuota()
-        if (current < max) {
-            prefs.edit().putInt(KEY_REMAINING_QUOTA, current + 1).apply()
+        val used = getUsedQuota()
+        if (used > 0) {
+            prefs.edit().putInt(KEY_USED_QUOTA, used - 1).apply()
             return true
         }
         return false
     }
 
     fun resetQuotaToFull() {
-        val max = getDailyFreeQuota()
-        val today = getCurrentDateKey()
         prefs.edit()
-            .putString(KEY_LAST_RESET_DATE, today)
-            .putInt(KEY_REMAINING_QUOTA, max)
+            .putString(KEY_LAST_RESET_DATE, getCurrentDateKey())
+            .putInt(KEY_USED_QUOTA, 0)
             .apply()
     }
 
@@ -271,5 +177,45 @@ class CreatorPreferences(private val context: Context) {
             jsonArray.put(item.toJson())
         }
         prefs.edit().putString(KEY_HISTORY_JSON, jsonArray.toString()).apply()
+    }
+    fun isLoggedIn(): Boolean = prefs.getBoolean(KEY_IS_LOGGED_IN, false)
+
+    fun getUserName(): String = prefs.getString(KEY_USER_NAME, "Creator") ?: "Creator"
+    fun getUserEmail(): String = prefs.getString(KEY_USER_EMAIL, "") ?: ""
+    fun setUserName(name: String) = prefs.edit().putString(KEY_USER_NAME, name).apply()
+
+    fun saveAuthTokens(idToken: String, refreshToken: String, localId: String, email: String, displayName: String) {
+        prefs.edit()
+            .putBoolean(KEY_IS_LOGGED_IN, true)
+            .putString(KEY_ID_TOKEN, idToken)
+            .putString(KEY_REFRESH_TOKEN, refreshToken)
+            .putString(KEY_LOCAL_ID, localId)
+            .putString(KEY_USER_EMAIL, email)
+            .putString(KEY_USER_NAME, displayName)
+            .apply()
+    }
+
+    fun getIdToken(): String = prefs.getString(KEY_ID_TOKEN, "") ?: ""
+    fun getRefreshToken(): String = prefs.getString(KEY_REFRESH_TOKEN, "") ?: ""
+
+    fun loginWithGoogle(name: String, email: String) {
+        prefs.edit()
+            .putBoolean(KEY_IS_LOGGED_IN, true)
+            .putString(KEY_USER_NAME, name)
+            .putString(KEY_USER_EMAIL, email)
+            .apply()
+    }
+
+    fun logoutUser() {
+        prefs.edit()
+            .putBoolean(KEY_IS_LOGGED_IN, false)
+            .remove(KEY_ID_TOKEN)
+            .remove(KEY_REFRESH_TOKEN)
+            .remove(KEY_LOCAL_ID)
+            .apply()
+    }
+
+    fun deleteAccountAndWipeData() {
+        prefs.edit().clear().apply()
     }
 }

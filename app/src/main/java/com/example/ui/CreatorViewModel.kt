@@ -86,18 +86,23 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun refreshState() {
-        _uiState.update { current ->
-            current.copy(
-                isLoggedIn = preferences.isLoggedIn(),
-                userName = preferences.getUserName(),
-                userEmail = preferences.getUserEmail(),
-                remainingQuota = preferences.getRemainingQuota(),
-                dailyFreeQuota = preferences.getDailyFreeQuota(),
-                history = preferences.getHistory(),
-                customApiKey = preferences.getSavedCustomApiKey(),
-                effectiveApiKey = preferences.getEffectiveApiKey(),
-                selectedModel = preferences.getSelectedModel()
-            )
+        // Fetch fresh config from Firestore
+        adConfigRepository.fetchConfig {
+            viewModelScope.launch {
+                _uiState.update { current ->
+                    current.copy(
+                        isLoggedIn = preferences.isLoggedIn(),
+                        userName = preferences.getUserName(),
+                        userEmail = preferences.getUserEmail(),
+                        remainingQuota = preferences.getRemainingQuota(),
+                        dailyFreeQuota = preferences.getDailyFreeQuota(),
+                        history = preferences.getHistory(),
+                        customApiKey = preferences.getSavedCustomApiKey(),
+                        effectiveApiKey = preferences.getEffectiveApiKey(),
+                        selectedModel = preferences.getSelectedModel()
+                    )
+                }
+            }
         }
     }
 
@@ -312,6 +317,9 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
 
     fun switchTab(tab: CreatorTab) {
         _uiState.update { it.copy(currentTab = tab, errorMessage = null) }
+        if (tab == CreatorTab.HOME) {
+            refreshState()
+        }
     }
 
     fun selectTool(toolId: AiToolId, prefillPrompt: String? = null, openDetail: Boolean = true) {
@@ -557,11 +565,19 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
     }
 
     private fun cleanAiResponse(response: String): String {
-        return response
+        var clean = response
             .replace("\\n", "\n")
             .replace("### ", "")
             .replace("###", "")
             .replace("**", "")
             .trim()
+
+        // Remove basic JSON wrapper if present
+        if (clean.startsWith("{\"text\":")) {
+            clean = clean.replaceFirst(Regex("\\{\"text\":\\s*\"?"), "")
+            clean = clean.removeSuffix("\"}").removeSuffix("}")
+        }
+        
+        return clean.trim()
     }
 }

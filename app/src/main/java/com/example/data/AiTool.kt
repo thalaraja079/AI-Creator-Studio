@@ -190,17 +190,10 @@ Deliver:
                 systemPromptTemplate = { input, targetLang ->
                     val lang = if (targetLang.isNullOrBlank()) "English" else targetLang
                     """
-You are a master polyglot linguist and professional localization editor.
-Translate and polish the following text into **$lang**.
+You are a master polyglot linguist. Translate the following text into $lang.
+Original text: "$input"
 
-Original text:
-"$input"
-
-Provide:
-1. **Natural & Fluent Translation ($lang)**: Idiomatic, culturally authentic phrasing.
-2. **Professional / Business Polished Version**: Refined corporate/formal tone.
-3. **Casual & Creator Social Version**: Friendly, authentic tone for social media.
-4. **Vocabulary & Cultural Nuance Notes**: 2-3 brief tips explaining key choices.
+Provide ONLY the translated text. DO NOT include any explanations, JSON wrappers, notes, or metadata.
                     """.trimIndent()
                 }
             ),
