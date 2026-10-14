@@ -195,6 +195,7 @@ class CreatorPreferences(private val context: Context) {
             .apply()
     }
 
+    fun getLocalId(): String = prefs.getString(KEY_LOCAL_ID, "") ?: ""
     fun getIdToken(): String = prefs.getString(KEY_ID_TOKEN, "") ?: ""
     fun getRefreshToken(): String = prefs.getString(KEY_REFRESH_TOKEN, "") ?: ""
 

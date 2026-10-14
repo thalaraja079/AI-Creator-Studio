@@ -116,6 +116,14 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             authClient.login(email, pass) { success, error ->
                 if (success) {
+                    val localId = preferences.getLocalId()
+                    val userRepository = getApplication<android.app.Application>().let { (it as com.example.CreatorApplication).userRepository }
+                    userRepository.getUserQuota(localId) { used ->
+                        if (used == null) {
+                            // First time login - init user in Firestore
+                            userRepository.createUser(localId, 0)
+                        }
+                    }
                     _uiState.update {
                         it.copy(
                             isLoggedIn = true,
@@ -150,6 +158,9 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             authClient.signUp(email, pass, name) { success, error ->
                 if (success) {
+                    val localId = preferences.getLocalId()
+                    val userRepository = getApplication<android.app.Application>().let { (it as com.example.CreatorApplication).userRepository }
+                    userRepository.createUser(localId, 0)
                     _uiState.update {
                         it.copy(
                             isLoggedIn = true,
