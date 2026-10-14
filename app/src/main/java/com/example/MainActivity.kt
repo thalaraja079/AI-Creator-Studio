@@ -5,8 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.animation.Crossfade
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.example.ui.CreatorViewModel
 import com.example.ui.MainScreen
+import com.example.ui.screens.AuthScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.google.android.gms.ads.MobileAds
 
@@ -26,7 +30,14 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MyApplicationTheme {
-                MainScreen(viewModel = creatorViewModel)
+                val state by creatorViewModel.uiState.collectAsState()
+                Crossfade(targetState = state.isLoggedIn, label = "auth_crossfade") { loggedIn ->
+                    if (!loggedIn) {
+                        AuthScreen(viewModel = creatorViewModel)
+                    } else {
+                        MainScreen(viewModel = creatorViewModel)
+                    }
+                }
             }
         }
     }

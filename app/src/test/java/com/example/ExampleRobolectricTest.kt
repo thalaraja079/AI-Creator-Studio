@@ -110,4 +110,57 @@ class ExampleRobolectricTest {
     viewModel.closeToolDetail()
     assertFalse(viewModel.uiState.value.isToolDetailOpen)
   }
+
+  @Test
+  fun `auth flow signup login and name update`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val viewModel = CreatorViewModel(context as Application)
+
+    // Sign up new user
+    val signedUp = viewModel.signUp("Sarah Connor", "sarah@creator.ai", "secretPass123")
+    assertTrue(signedUp)
+    assertTrue(viewModel.uiState.value.isLoggedIn)
+    assertEquals("Sarah Connor", viewModel.uiState.value.userName)
+    assertEquals("sarah@creator.ai", viewModel.uiState.value.userEmail)
+
+    // Update user profile name
+    viewModel.updateUserName("Sarah C. Producer")
+    assertEquals("Sarah C. Producer", viewModel.uiState.value.userName)
+
+    // Log out
+    viewModel.logout()
+    assertFalse(viewModel.uiState.value.isLoggedIn)
+
+    // Log back in
+    val loggedIn = viewModel.login("sarah@creator.ai", "secretPass123")
+    assertTrue(loggedIn)
+    assertTrue(viewModel.uiState.value.isLoggedIn)
+  }
+
+  @Test
+  fun `google play compliant delete account wipes all data`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val viewModel = CreatorViewModel(context as Application)
+
+    viewModel.signUp("John Doe", "john@doe.ai", "pass123")
+    assertTrue(viewModel.uiState.value.isLoggedIn)
+
+    // Add dummy history item
+    val item = GenerationHistoryItem(
+      toolId = "TEST",
+      toolTitle = "Test Tool",
+      emojiIcon = "🧪",
+      prompt = "Hello",
+      output = "World"
+    )
+    val prefs = CreatorPreferences(context)
+    prefs.saveHistoryItem(item)
+    assertTrue(prefs.getHistory().isNotEmpty())
+
+    // Trigger delete account
+    viewModel.deleteAccount()
+    assertFalse(viewModel.uiState.value.isLoggedIn)
+    assertEquals(0, prefs.getHistory().size)
+    assertFalse(prefs.isLoggedIn())
+  }
 }

@@ -126,7 +126,7 @@ fun HomeDashboardScreen(
                             )
                         )
                         Text(
-                            text = "Welcome back, Creator 👋",
+                            text = "Welcome back, ${state.userName} 👋",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

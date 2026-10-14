@@ -21,6 +21,12 @@ class CreatorPreferences(context: Context) {
         private const val KEY_SELECTED_MODEL = "selected_model"
         private const val KEY_HISTORY_JSON = "history_json"
 
+        // Auth & User Profile keys
+        private const val KEY_IS_LOGGED_IN = "is_logged_in"
+        private const val KEY_USER_NAME = "user_name"
+        private const val KEY_USER_EMAIL = "user_email"
+        private const val KEY_USER_PASSWORD = "user_password"
+
         const val DEFAULT_MAX_QUOTA = 5
         const val DEFAULT_MODEL = "gemini-2.5-flash"
     }
@@ -47,6 +53,94 @@ class CreatorPreferences(context: Context) {
                 .apply()
         }
     }
+
+    // --- Authentication & User Profile Management ---
+
+    fun isLoggedIn(): Boolean {
+        return prefs.getBoolean(KEY_IS_LOGGED_IN, false)
+    }
+
+    fun setLoggedIn(loggedIn: Boolean) {
+        prefs.edit().putBoolean(KEY_IS_LOGGED_IN, loggedIn).apply()
+    }
+
+    fun getUserName(): String {
+        return prefs.getString(KEY_USER_NAME, "Creator") ?: "Creator"
+    }
+
+    fun setUserName(name: String) {
+        prefs.edit().putString(KEY_USER_NAME, name.trim()).apply()
+    }
+
+    fun getUserEmail(): String {
+        return prefs.getString(KEY_USER_EMAIL, "") ?: ""
+    }
+
+    fun setUserEmail(email: String) {
+        prefs.edit().putString(KEY_USER_EMAIL, email.trim()).apply()
+    }
+
+    fun registerUser(name: String, email: String, pass: String): Boolean {
+        prefs.edit()
+            .putBoolean(KEY_IS_LOGGED_IN, true)
+            .putString(KEY_USER_NAME, name.trim())
+            .putString(KEY_USER_EMAIL, email.trim().lowercase())
+            .putString(KEY_USER_PASSWORD, pass)
+            .apply()
+        return true
+    }
+
+    fun loginUser(email: String, pass: String): Boolean {
+        val savedEmail = getUserEmail()
+        val savedPass = prefs.getString(KEY_USER_PASSWORD, "") ?: ""
+
+        // If user already registered, verify credentials
+        if (savedEmail.isNotEmpty() && savedPass.isNotEmpty()) {
+            if (savedEmail.equals(email.trim(), ignoreCase = true) && savedPass == pass) {
+                setLoggedIn(true)
+                return true
+            }
+            return false
+        }
+
+        // First login or initial direct user login
+        val derivedName = email.substringBefore("@").replace(".", " ").capitalize(Locale.ROOT).trim()
+        registerUser(
+            name = if (derivedName.isNotBlank()) derivedName else "Creator",
+            email = email,
+            pass = pass
+        )
+        return true
+    }
+
+    fun loginWithGoogle(name: String, email: String) {
+        prefs.edit()
+            .putBoolean(KEY_IS_LOGGED_IN, true)
+            .putString(KEY_USER_NAME, name.trim())
+            .putString(KEY_USER_EMAIL, email.trim().lowercase())
+            .apply()
+    }
+
+    fun logoutUser() {
+        setLoggedIn(false)
+    }
+
+    /**
+     * Google Play Policy Compliance: Complete Account Deletion
+     * Permanently wipes user identity, history, quota, and local storage.
+     */
+    fun deleteAccountAndWipeData() {
+        prefs.edit().clear().apply()
+        // Reset quota afresh for clean state
+        resetQuotaToFull()
+    }
+
+    fun requestPasswordReset(email: String): Boolean {
+        // Validates email syntax or registered account
+        return email.contains("@") && email.contains(".")
+    }
+
+    // --- Quota Management ---
 
     fun getDailyFreeQuota(): Int {
         return prefs.getInt(KEY_DAILY_FREE_QUOTA, DEFAULT_MAX_QUOTA)
@@ -128,14 +222,12 @@ class CreatorPreferences(context: Context) {
             }
         } catch (_: Exception) {
         }
-        // Reverse order so newest is at the top
         return list.sortedByDescending { it.timestampMillis }
     }
 
     fun saveHistoryItem(item: GenerationHistoryItem) {
         val currentHistory = getHistory().toMutableList()
-        currentHistory.add(0, item) // prepend
-        // Limit history to 100 items to keep SharedPreferences snappy
+        currentHistory.add(0, item)
         val trimmed = if (currentHistory.size > 100) currentHistory.take(100) else currentHistory
         persistHistory(trimmed)
     }

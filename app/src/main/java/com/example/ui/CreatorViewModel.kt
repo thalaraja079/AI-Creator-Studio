@@ -32,6 +32,17 @@ enum class KeyTestStatus {
 
 data class CreatorUiState(
     val currentTab: CreatorTab = CreatorTab.HOME,
+    // Auth & Profile
+    val isLoggedIn: Boolean = false,
+    val userName: String = "Creator",
+    val userEmail: String = "",
+    val authErrorMessage: String? = null,
+    val forgotPasswordSent: Boolean = false,
+    val showPrivacyPolicyDialog: Boolean = false,
+    val showEditNameDialog: Boolean = false,
+    val showLogoutConfirmDialog: Boolean = false,
+    val showDeleteAccountConfirmDialog: Boolean = false,
+    // Quota & Tools
     val remainingQuota: Int = CreatorPreferences.DEFAULT_MAX_QUOTA,
     val dailyFreeQuota: Int = CreatorPreferences.DEFAULT_MAX_QUOTA,
     val selectedToolId: AiToolId = AiToolId.YOUTUBE_SEO_TAGS,
@@ -60,6 +71,9 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
 
     private val _uiState = MutableStateFlow(
         CreatorUiState(
+            isLoggedIn = preferences.isLoggedIn(),
+            userName = preferences.getUserName(),
+            userEmail = preferences.getUserEmail(),
             remainingQuota = preferences.getRemainingQuota(),
             dailyFreeQuota = preferences.getDailyFreeQuota(),
             history = preferences.getHistory(),
@@ -79,6 +93,9 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
     private fun refreshState() {
         _uiState.update { current ->
             current.copy(
+                isLoggedIn = preferences.isLoggedIn(),
+                userName = preferences.getUserName(),
+                userEmail = preferences.getUserEmail(),
                 remainingQuota = preferences.getRemainingQuota(),
                 dailyFreeQuota = preferences.getDailyFreeQuota(),
                 history = preferences.getHistory(),
@@ -88,6 +105,165 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
             )
         }
     }
+
+    // --- Authentication & User Profile ---
+
+    fun login(email: String, pass: String): Boolean {
+        if (email.isBlank() || pass.isBlank()) {
+            _uiState.update { it.copy(authErrorMessage = "Please enter both email and password.") }
+            return false
+        }
+        val success = preferences.loginUser(email, pass)
+        if (success) {
+            _uiState.update {
+                it.copy(
+                    isLoggedIn = true,
+                    userName = preferences.getUserName(),
+                    userEmail = preferences.getUserEmail(),
+                    authErrorMessage = null,
+                    currentTab = CreatorTab.HOME
+                )
+            }
+            return true
+        } else {
+            _uiState.update { it.copy(authErrorMessage = "Invalid email or password.") }
+            return false
+        }
+    }
+
+    fun signUp(name: String, email: String, pass: String): Boolean {
+        if (name.isBlank() || email.isBlank() || pass.isBlank()) {
+            _uiState.update { it.copy(authErrorMessage = "All fields are required.") }
+            return false
+        }
+        if (!email.contains("@") || !email.contains(".")) {
+            _uiState.update { it.copy(authErrorMessage = "Please enter a valid email address.") }
+            return false
+        }
+        if (pass.length < 6) {
+            _uiState.update { it.copy(authErrorMessage = "Password must be at least 6 characters.") }
+            return false
+        }
+
+        val success = preferences.registerUser(name, email, pass)
+        if (success) {
+            _uiState.update {
+                it.copy(
+                    isLoggedIn = true,
+                    userName = preferences.getUserName(),
+                    userEmail = preferences.getUserEmail(),
+                    authErrorMessage = null,
+                    currentTab = CreatorTab.HOME
+                )
+            }
+            return true
+        }
+        return false
+    }
+
+    fun loginWithGoogle(name: String = "Google Creator", email: String = "creator.google@gmail.com") {
+        preferences.loginWithGoogle(name, email)
+        _uiState.update {
+            it.copy(
+                isLoggedIn = true,
+                userName = preferences.getUserName(),
+                userEmail = preferences.getUserEmail(),
+                authErrorMessage = null,
+                currentTab = CreatorTab.HOME
+            )
+        }
+    }
+
+    fun logout() {
+        preferences.logoutUser()
+        _uiState.update {
+            it.copy(
+                isLoggedIn = false,
+                showLogoutConfirmDialog = false,
+                currentTab = CreatorTab.HOME
+            )
+        }
+    }
+
+    fun deleteAccount() {
+        preferences.deleteAccountAndWipeData()
+        _uiState.update {
+            it.copy(
+                isLoggedIn = false,
+                userName = "Creator",
+                userEmail = "",
+                remainingQuota = preferences.getRemainingQuota(),
+                history = emptyList(),
+                customApiKey = "",
+                showDeleteAccountConfirmDialog = false,
+                currentTab = CreatorTab.HOME
+            )
+        }
+    }
+
+    fun updateUserName(newName: String) {
+        if (newName.isNotBlank()) {
+            preferences.setUserName(newName.trim())
+            _uiState.update {
+                it.copy(
+                    userName = preferences.getUserName(),
+                    showEditNameDialog = false
+                )
+            }
+        }
+    }
+
+    fun requestPasswordReset(email: String): Boolean {
+        if (email.isBlank() || !email.contains("@")) {
+            return false
+        }
+        val sent = preferences.requestPasswordReset(email)
+        _uiState.update { it.copy(forgotPasswordSent = sent) }
+        return sent
+    }
+
+    fun clearAuthErrorMessage() {
+        _uiState.update { it.copy(authErrorMessage = null) }
+    }
+
+    fun resetForgotPasswordStatus() {
+        _uiState.update { it.copy(forgotPasswordSent = false) }
+    }
+
+    // Dialog toggles
+    fun openPrivacyPolicyDialog() {
+        _uiState.update { it.copy(showPrivacyPolicyDialog = true) }
+    }
+
+    fun dismissPrivacyPolicyDialog() {
+        _uiState.update { it.copy(showPrivacyPolicyDialog = false) }
+    }
+
+    fun openEditNameDialog() {
+        _uiState.update { it.copy(showEditNameDialog = true) }
+    }
+
+    fun dismissEditNameDialog() {
+        _uiState.update { it.copy(showEditNameDialog = false) }
+    }
+
+    fun openLogoutDialog() {
+        _uiState.update { it.copy(showLogoutConfirmDialog = true) }
+    }
+
+    fun dismissLogoutDialog() {
+        _uiState.update { it.copy(showLogoutConfirmDialog = false) }
+    }
+
+    fun openDeleteAccountDialog() {
+        _uiState.update { it.copy(showDeleteAccountConfirmDialog = true) }
+    }
+
+    fun dismissDeleteAccountDialog() {
+        _uiState.update { it.copy(showDeleteAccountConfirmDialog = false) }
+    }
+
+    // --- Tab & Tool Navigation ---
 
     fun switchTab(tab: CreatorTab) {
         _uiState.update { it.copy(currentTab = tab, errorMessage = null) }
