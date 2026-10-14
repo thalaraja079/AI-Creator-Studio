@@ -4,7 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.os.Bundle
-import com.example.data.repository.FirebaseAdConfigRepository
+import com.example.data.repository.AppConfigRepository
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
@@ -12,7 +12,7 @@ import com.google.android.gms.ads.appopen.AppOpenAd
 
 class AppOpenAdManager(
     private val application: Application,
-    private val adConfigRepository: FirebaseAdConfigRepository
+    private val adConfigRepository: AppConfigRepository
 ) : Application.ActivityLifecycleCallbacks {
 
     private var appOpenAd: AppOpenAd? = null

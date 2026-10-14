@@ -8,7 +8,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class CreatorPreferences(context: Context) {
+class CreatorPreferences(private val context: Context) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("ai_creator_studio_prefs", Context.MODE_PRIVATE)
@@ -166,7 +166,8 @@ class CreatorPreferences(context: Context) {
     // --- Quota Management ---
 
     fun getDailyFreeQuota(): Int {
-        return prefs.getInt(KEY_DAILY_FREE_QUOTA, DEFAULT_MAX_QUOTA)
+        val appConfigPrefs = context.getSharedPreferences("app_config", Context.MODE_PRIVATE)
+        return appConfigPrefs.getInt(KEY_DAILY_FREE_QUOTA, DEFAULT_MAX_QUOTA)
     }
 
     fun getRemainingQuota(): Int {
