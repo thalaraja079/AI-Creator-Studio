@@ -68,6 +68,7 @@ data class CreatorUiState(
 class CreatorViewModel(application: Application) : AndroidViewModel(application) {
 
     private val preferences = CreatorPreferences(application)
+    private val adConfigRepository = (application as com.example.CreatorApplication).adConfigRepository
 
     private val _uiState = MutableStateFlow(
         CreatorUiState(
