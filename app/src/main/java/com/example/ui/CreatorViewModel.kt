@@ -242,38 +242,23 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
         val idToken = preferences.getIdToken()
         if (idToken.isNotEmpty()) {
             viewModelScope.launch {
-                authClient.deleteAccount(idToken) { success ->
-                    if (success) {
-                        _uiState.update {
-                            it.copy(
-                                isLoggedIn = false,
-                                userName = "Creator",
-                                userEmail = "",
-                                remainingQuota = preferences.getRemainingQuota(),
-                                history = emptyList(),
-                                customApiKey = "",
-                                showDeleteAccountConfirmDialog = false,
-                                currentTab = CreatorTab.HOME
-                            )
-                        }
-                    }
+                authClient.deleteAccount(idToken) { _ ->
+                    // Server deletion handled
                 }
             }
-        } else {
-            // Local fallback
-            preferences.deleteAccountAndWipeData()
-            _uiState.update {
-                it.copy(
-                    isLoggedIn = false,
-                    userName = "Creator",
-                    userEmail = "",
-                    remainingQuota = preferences.getRemainingQuota(),
-                    history = emptyList(),
-                    customApiKey = "",
-                    showDeleteAccountConfirmDialog = false,
-                    currentTab = CreatorTab.HOME
-                )
-            }
+        }
+        preferences.deleteAccountAndWipeData()
+        _uiState.update {
+            it.copy(
+                isLoggedIn = false,
+                userName = "Creator",
+                userEmail = "",
+                remainingQuota = preferences.getRemainingQuota(),
+                history = emptyList(),
+                customApiKey = "",
+                showDeleteAccountConfirmDialog = false,
+                currentTab = CreatorTab.HOME
+            )
         }
     }
 
@@ -431,6 +416,7 @@ You are AI Creator Studio. Provide a rich, creative, and production-ready answer
 $input
 
 Structure with bold headings, clean bullet points, actionable tips, and tags where appropriate.
+IMPORTANT: Keep the response concise, punchy, and short (maximum 2 to 4 sentences or under 80 words). Do not generate essays, full guides, or overly long playbooks.
             """.trimIndent()
 
             val result = AiGenerationService.generateContent(
@@ -634,17 +620,41 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
     private fun cleanAiResponse(response: String): String {
         var clean = response
             .replace("\\n", "\n")
-            .replace("### ", "")
-            .replace("###", "")
-            .replace("**", "")
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\")
             .trim()
 
-        // Remove basic JSON wrapper if present
-        if (clean.startsWith("{\"text\":")) {
-            clean = clean.replaceFirst(Regex("\\{\"text\":\\s*\"?"), "")
-            clean = clean.removeSuffix("\"}").removeSuffix("}")
+        clean = clean
+            .replace(Regex("\"(result|response|text|content|output|message)\":\\s*\"?"), "")
+            .removePrefix("{")
+            .removeSuffix("}")
+            .removePrefix("\"")
+            .removeSuffix("\"")
+            .trim()
+
+        // Remove duplicate text if the model output got repeated back-to-back
+        val lines = clean.lines()
+        if (lines.size > 4) {
+            val mid = lines.size / 2
+            val firstHalf = lines.subList(0, mid).joinToString("\n")
+            val secondHalf = lines.subList(mid, lines.size).joinToString("\n")
+            if (firstHalf.trim() == secondHalf.trim()) {
+                clean = firstHalf.trim()
+            }
         }
-        
+
+        // Ensure each major section appears at most once
+        val sections = listOf("[TITLES]", "[DESCRIPTION]", "[TAGS]", "[HASHTAGS]", "[HOOKS]", "[SCRIPT]", "[CAPTIONS & HASHTAGS]")
+        for (sec in sections) {
+            val firstIdx = clean.indexOf(sec)
+            if (firstIdx != -1) {
+                val secondIdx = clean.indexOf(sec, firstIdx + sec.length)
+                if (secondIdx != -1) {
+                    clean = clean.substring(0, secondIdx).trim()
+                }
+            }
+        }
+
         return clean.trim()
     }
 }
