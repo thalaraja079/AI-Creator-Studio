@@ -125,7 +125,8 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
                     userRepository.getUserData(localId) { fields ->
                         if (fields == null) {
                             // First time login - init user in Firestore
-                            userRepository.createUser(localId, email, maxCredits)
+                            val today = java.time.LocalDate.now().toString()
+                            userRepository.createUser(localId, email, maxCredits, today)
                             preferences.resetQuotaToFull()
                         } else {
                             // Existing user - fetch remaining credits
@@ -133,6 +134,7 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
                             // used = max - remaining
                             val used = maxOf(0, maxCredits - remainingCredits)
                             preferences.setUsedQuotaForLogin(used)
+                            _uiState.update { it.copy(remainingQuota = remainingCredits) }
                         }
                     }
                     
@@ -176,7 +178,8 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
                     val userRepository = getApplication<android.app.Application>().let { (it as com.example.CreatorApplication).userRepository }
                     val maxCredits = adConfigRepository.getDailyFreeQuota()
                     
-                    userRepository.createUser(localId, email, maxCredits)
+                    val today = java.time.LocalDate.now().toString()
+                    userRepository.createUser(localId, email, maxCredits, today)
                     preferences.resetQuotaToFull()
                     
                     _uiState.update {
@@ -438,7 +441,8 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
                     val newRemaining = preferences.getRemainingQuota()
                     val localId = preferences.getLocalId()
                     val userRepository = getApplication<android.app.Application>().let { (it as com.example.CreatorApplication).userRepository }
-                    userRepository.updateUserData(localId, newRemaining)
+                    val today = java.time.LocalDate.now().toString()
+                    userRepository.updateUserData(localId, newRemaining, maxOf(0, state.dailyFreeQuota - newRemaining), today)
                     
                     val cleanResponse = cleanAiResponse(responseText)
                     val historyItem = GenerationHistoryItem(
@@ -509,7 +513,8 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
                     val newRemaining = preferences.getRemainingQuota()
                     val localId = preferences.getLocalId()
                     val userRepository = getApplication<android.app.Application>().let { (it as com.example.CreatorApplication).userRepository }
-                    userRepository.updateUserData(localId, newRemaining)
+                    val today = java.time.LocalDate.now().toString()
+                    userRepository.updateUserData(localId, newRemaining, maxOf(0, state.dailyFreeQuota - newRemaining), today)
                     
                     val cleanResponse = cleanAiResponse(responseText)
                     val historyItem = GenerationHistoryItem(
@@ -565,7 +570,7 @@ Structure with bold headings, clean bullet points, actionable tips, and tags whe
             val newRemaining = preferences.getRemainingQuota()
             val localId = preferences.getLocalId()
             val userRepository = getApplication<android.app.Application>().let { (it as com.example.CreatorApplication).userRepository }
-            userRepository.updateUserData(localId, newRemaining)
+            userRepository.updateUserData(localId, newRemaining, maxOf(0, state.dailyFreeQuota - newRemaining), java.time.LocalDate.now().toString())
             
             delay(300)
             _uiState.update {

@@ -35,20 +35,20 @@ class UserRepository(private val apiKey: String) {
         })
     }
 
-    fun updateUserData(localId: String, remainingCredits: Int) {
-        val url = "$baseUrl/$localId?key=$apiKey&updateMask.fieldPaths=remaining_credits"
+    fun updateUserData(localId: String, remainingCredits: Int, usedCredits: Int, lastResetDate: String) {
+        val url = "$baseUrl/$localId?key=$apiKey&updateMask.fieldPaths=remaining_credits&updateMask.fieldPaths=used_credits&updateMask.fieldPaths=last_reset_date"
         val json = JSONObject().apply {
             put("fields", JSONObject().apply {
-                put("remaining_credits", JSONObject().apply {
-                    put("integerValue", remainingCredits.toString())
-                })
+                put("remaining_credits", JSONObject().apply { put("integerValue", remainingCredits.toString()) })
+                put("used_credits", JSONObject().apply { put("integerValue", usedCredits.toString()) })
+                put("last_reset_date", JSONObject().apply { put("stringValue", lastResetDate) })
             })
         }
         val body = json.toString().toRequestBody("application/json".toMediaType())
         val request = Request.Builder().url(url).patch(body).build()
         client.newCall(request).enqueue(object : okhttp3.Callback {
             override fun onFailure(call: okhttp3.Call, e: IOException) {
-                Log.e("UserRepository", "Failed to update credits", e)
+                Log.e("UserRepository", "Failed to update user data", e)
             }
             override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
                 // Ignore
@@ -56,13 +56,15 @@ class UserRepository(private val apiKey: String) {
         })
     }
     
-    fun createUser(localId: String, email: String, maxCredits: Int) {
+    fun createUser(localId: String, email: String, maxCredits: Int, lastResetDate: String) {
         val url = "$baseUrl?key=$apiKey&documentId=$localId"
         val json = JSONObject().apply {
             put("fields", JSONObject().apply {
                 put("email", JSONObject().apply { put("stringValue", email) })
                 put("remaining_credits", JSONObject().apply { put("integerValue", maxCredits.toString()) })
                 put("max_credits", JSONObject().apply { put("integerValue", maxCredits.toString()) })
+                put("used_credits", JSONObject().apply { put("integerValue", "0") })
+                put("last_reset_date", JSONObject().apply { put("stringValue", lastResetDate) })
             })
         }
         val body = json.toString().toRequestBody("application/json".toMediaType())
