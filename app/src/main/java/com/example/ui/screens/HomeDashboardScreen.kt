@@ -181,6 +181,7 @@ fun HomeDashboardScreen(
                         }
 
                         // Action button to simulate/test quota usage
+                        /*
                         OutlinedButton(
                             onClick = { viewModel.simulateUseOneCredit() },
                             shape = RoundedCornerShape(12.dp),
@@ -196,6 +197,7 @@ fun HomeDashboardScreen(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Use 1", fontSize = 12.sp)
                         }
+                        */
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
