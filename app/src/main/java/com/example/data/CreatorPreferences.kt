@@ -26,6 +26,11 @@ class CreatorPreferences(context: Context) {
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_USER_PASSWORD = "user_password"
+        
+        // Token storage
+        private const val KEY_ID_TOKEN = "id_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
+        private const val KEY_LOCAL_ID = "local_id"
 
         const val DEFAULT_MAX_QUOTA = 5
         const val DEFAULT_MODEL = "gemini-2.5-flash"
@@ -121,8 +126,26 @@ class CreatorPreferences(context: Context) {
             .apply()
     }
 
+    fun saveAuthTokens(idToken: String, refreshToken: String, localId: String, email: String, name: String) {
+        prefs.edit()
+            .putBoolean(KEY_IS_LOGGED_IN, true)
+            .putString(KEY_ID_TOKEN, idToken)
+            .putString(KEY_REFRESH_TOKEN, refreshToken)
+            .putString(KEY_LOCAL_ID, localId)
+            .putString(KEY_USER_EMAIL, email)
+            .putString(KEY_USER_NAME, name)
+            .apply()
+    }
+
+    fun getIdToken(): String = prefs.getString(KEY_ID_TOKEN, "") ?: ""
+    fun getLocalId(): String = prefs.getString(KEY_LOCAL_ID, "") ?: ""
+    
     fun logoutUser() {
-        setLoggedIn(false)
+        prefs.edit().remove(KEY_IS_LOGGED_IN)
+            .remove(KEY_ID_TOKEN)
+            .remove(KEY_REFRESH_TOKEN)
+            .remove(KEY_LOCAL_ID)
+            .apply()
     }
 
     /**

@@ -68,6 +68,7 @@ data class CreatorUiState(
 class CreatorViewModel(application: Application) : AndroidViewModel(application) {
 
     private val preferences = CreatorPreferences(application)
+    private val authClient = (application as com.example.CreatorApplication).authClient
     private val adConfigRepository = (application as com.example.CreatorApplication).adConfigRepository
 
     private val _uiState = MutableStateFlow(
@@ -114,22 +115,24 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
             _uiState.update { it.copy(authErrorMessage = "Please enter both email and password.") }
             return false
         }
-        val success = preferences.loginUser(email, pass)
-        if (success) {
-            _uiState.update {
-                it.copy(
-                    isLoggedIn = true,
-                    userName = preferences.getUserName(),
-                    userEmail = preferences.getUserEmail(),
-                    authErrorMessage = null,
-                    currentTab = CreatorTab.HOME
-                )
+        viewModelScope.launch {
+            authClient.login(email, pass) { success, error ->
+                if (success) {
+                    _uiState.update {
+                        it.copy(
+                            isLoggedIn = true,
+                            userName = preferences.getUserName(),
+                            userEmail = preferences.getUserEmail(),
+                            authErrorMessage = null,
+                            currentTab = CreatorTab.HOME
+                        )
+                    }
+                } else {
+                    _uiState.update { it.copy(authErrorMessage = error ?: "Login failed") }
+                }
             }
-            return true
-        } else {
-            _uiState.update { it.copy(authErrorMessage = "Invalid email or password.") }
-            return false
         }
+        return true
     }
 
     fun signUp(name: String, email: String, pass: String): Boolean {
@@ -146,20 +149,24 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
             return false
         }
 
-        val success = preferences.registerUser(name, email, pass)
-        if (success) {
-            _uiState.update {
-                it.copy(
-                    isLoggedIn = true,
-                    userName = preferences.getUserName(),
-                    userEmail = preferences.getUserEmail(),
-                    authErrorMessage = null,
-                    currentTab = CreatorTab.HOME
-                )
+        viewModelScope.launch {
+            authClient.signUp(email, pass, name) { success, error ->
+                if (success) {
+                    _uiState.update {
+                        it.copy(
+                            isLoggedIn = true,
+                            userName = preferences.getUserName(),
+                            userEmail = preferences.getUserEmail(),
+                            authErrorMessage = null,
+                            currentTab = CreatorTab.HOME
+                        )
+                    }
+                } else {
+                    _uiState.update { it.copy(authErrorMessage = error ?: "Sign Up failed") }
+                }
             }
-            return true
         }
-        return false
+        return true
     }
 
     fun loginWithGoogle(name: String = "Google Creator", email: String = "creator.google@gmail.com") {
@@ -187,29 +194,70 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun deleteAccount() {
-        preferences.deleteAccountAndWipeData()
-        _uiState.update {
-            it.copy(
-                isLoggedIn = false,
-                userName = "Creator",
-                userEmail = "",
-                remainingQuota = preferences.getRemainingQuota(),
-                history = emptyList(),
-                customApiKey = "",
-                showDeleteAccountConfirmDialog = false,
-                currentTab = CreatorTab.HOME
-            )
+        val idToken = preferences.getIdToken()
+        if (idToken.isNotEmpty()) {
+            viewModelScope.launch {
+                authClient.deleteAccount(idToken) { success ->
+                    if (success) {
+                        _uiState.update {
+                            it.copy(
+                                isLoggedIn = false,
+                                userName = "Creator",
+                                userEmail = "",
+                                remainingQuota = preferences.getRemainingQuota(),
+                                history = emptyList(),
+                                customApiKey = "",
+                                showDeleteAccountConfirmDialog = false,
+                                currentTab = CreatorTab.HOME
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            // Local fallback
+            preferences.deleteAccountAndWipeData()
+            _uiState.update {
+                it.copy(
+                    isLoggedIn = false,
+                    userName = "Creator",
+                    userEmail = "",
+                    remainingQuota = preferences.getRemainingQuota(),
+                    history = emptyList(),
+                    customApiKey = "",
+                    showDeleteAccountConfirmDialog = false,
+                    currentTab = CreatorTab.HOME
+                )
+            }
         }
     }
 
     fun updateUserName(newName: String) {
         if (newName.isNotBlank()) {
-            preferences.setUserName(newName.trim())
-            _uiState.update {
-                it.copy(
-                    userName = preferences.getUserName(),
-                    showEditNameDialog = false
-                )
+            val idToken = preferences.getIdToken()
+            if (idToken.isNotEmpty()) {
+                viewModelScope.launch {
+                    authClient.updateDisplayName(idToken, newName.trim()) { success ->
+                        if (success) {
+                            preferences.setUserName(newName.trim())
+                            _uiState.update {
+                                it.copy(
+                                    userName = preferences.getUserName(),
+                                    showEditNameDialog = false
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Fallback for local-only users
+                preferences.setUserName(newName.trim())
+                _uiState.update {
+                    it.copy(
+                        userName = preferences.getUserName(),
+                        showEditNameDialog = false
+                    )
+                }
             }
         }
     }
@@ -218,9 +266,12 @@ class CreatorViewModel(application: Application) : AndroidViewModel(application)
         if (email.isBlank() || !email.contains("@")) {
             return false
         }
-        val sent = preferences.requestPasswordReset(email)
-        _uiState.update { it.copy(forgotPasswordSent = sent) }
-        return sent
+        viewModelScope.launch {
+            authClient.sendPasswordReset(email) { sent ->
+                _uiState.update { it.copy(forgotPasswordSent = sent) }
+            }
+        }
+        return true
     }
 
     fun clearAuthErrorMessage() {
